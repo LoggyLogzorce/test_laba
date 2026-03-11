@@ -10,6 +10,7 @@ import (
 	"masha_laba_3/internal/services"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 func jsonEscape(i []byte) string {
@@ -385,13 +386,15 @@ func (h *Handlers) DeleteTest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := r.PathValue("id")
-	idInt, err := strconv.Atoi(id)
+	idStr := strings.TrimPrefix(r.URL.Path, "/api/test/delete/")
+
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
+		http.Error(w, "invalid id", http.StatusBadRequest)
 		return
 	}
-	err = h.services.DeleteTest(idInt)
+
+	err = h.services.DeleteTest(id)
 	if err != nil {
 		http.Error(w, "Failed to delete test", http.StatusInternalServerError)
 		return
@@ -442,10 +445,11 @@ func (h *Handlers) GetQuestionsByTest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := r.PathValue("id")
-	idUint, err := strconv.ParseUint(id, 10, 64)
+	idStr := strings.TrimPrefix(r.URL.Path, "/api/questions/test/")
+
+	idUint, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
+		http.Error(w, "invalid id", http.StatusBadRequest)
 		return
 	}
 
@@ -475,10 +479,17 @@ func (h *Handlers) GetOptionsByQuestion(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	id := r.PathValue("id")
-	idUint, err := strconv.ParseUint(id, 10, 64)
+	path := strings.TrimPrefix(r.URL.Path, "/api/question/")
+	parts := strings.Split(path, "/")
+
+	if len(parts) < 2 || parts[1] != "options" {
+		http.NotFound(w, r)
+		return
+	}
+
+	idUint, err := strconv.ParseUint(parts[0], 10, 64)
 	if err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
+		http.Error(w, "invalid id", http.StatusBadRequest)
 		return
 	}
 

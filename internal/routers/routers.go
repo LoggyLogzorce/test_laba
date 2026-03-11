@@ -27,8 +27,8 @@ func SetupRoutes(h *handlers.Handlers) *http.ServeMux {
 	mux.HandleFunc("/api/test/update", middleware.AuthRequired(middleware.RBAC("admin", "tester")(h.UpdateTest)))
 	mux.HandleFunc("/api/test/delete/{id}", middleware.AuthRequired(middleware.RBAC("admin")(h.DeleteTest)))
 	mux.HandleFunc("/api/categories", middleware.AuthRequired(h.GetCategory))
-	mux.HandleFunc("/api/questions/test/{id}", middleware.AuthRequired(h.GetQuestionsByTest))
-	mux.HandleFunc("/api/question/{id}/options", middleware.AuthRequired(h.GetOptionsByQuestion))
+	mux.HandleFunc("/api/questions/test/", middleware.AuthRequired(h.GetQuestionsByTest))
+	mux.HandleFunc("/api/question/", middleware.AuthRequired(h.GetOptionsByQuestion))
 
 	// API Auth
 	mux.HandleFunc("/api/login", h.Login)
