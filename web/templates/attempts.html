@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Попытки</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ddd; padding: 8px; }
+        .pass { color: green; } .fail { color: red; }
+    </style>
+</head>
+<body>
+<h2>Мои попытки</h2>
+<a href="/tests">Назад к тестам</a>
+
+<table>
+    <thead>
+    <tr><th>ID</th><th>Дата</th><th>Статус</th><th>Балл</th><th>Сдан</th></tr>
+    </thead>
+    <tbody id="attemptsTable"></tbody>
+</table>
+
+<script>
+    async function loadAttempts() {
+        const res = await fetch('/api/attempts');
+        const attempts = await res.json();
+        document.getElementById('attemptsTable').innerHTML = attempts.map(a => `
+                <tr>
+                    <td>${a.ID}</td>
+                    <td>${new Date(a.StartTime).toLocaleString()}</td>
+                    <td>${a.Status}</td>
+                    <td>${a.Score || '-'}</td>
+                    <td class="${a.Passed ? 'pass' : 'fail'}">${a.Passed ? 'Да' : 'Нет'}</td>
+                </tr>
+            `).join('');
+    }
+    loadAttempts();
+</script>
+</body>
+</html>

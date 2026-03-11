@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Регистрация</title>
+  <style>
+    body { font-family: Arial; max-width: 400px; margin: 50px auto; }
+    input, select { width: 100%; margin: 10px 0; padding: 8px; }
+    button { width: 100%; padding: 10px; }
+  </style>
+</head>
+<body>
+<h2>Регистрация</h2>
+<form id="registerForm">
+  <input type="text" name="login" placeholder="Логин" required>
+  <input type="password" name="password" placeholder="Пароль" required>
+  <input type="text" name="surname" placeholder="Фамилия" required>
+  <input type="text" name="name" placeholder="Имя" required>
+  <input type="email" name="email" placeholder="Email" required>
+  <select name="role">
+    <option value="student">Student</option>
+    <option value="tester">Tester</option>
+    <option value="admin">Admin</option>
+  </select>
+  <button type="submit">Зарегистрироваться</button>
+</form>
+<a href="/login">На вход</a>
+
+<script>
+  document.getElementById('registerForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const res = await fetch('/api/register', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(Object.fromEntries(new FormData(e.target)))
+    });
+    if (res.ok) location.href = '/login';
+    else alert('Ошибка регистрации');
+  };
+</script>
+</body>
+</html>

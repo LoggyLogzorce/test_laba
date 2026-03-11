@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>2FA Верификация</title>
+    <style>
+        body { font-family: Arial; max-width: 400px; margin: 50px auto; }
+        input { width: 100%; margin: 10px 0; padding: 8px; }
+        button { width: 100%; padding: 10px; }
+        .error { color: red; }
+        .info { background: #e7f3fe; padding: 10px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+<h2>Двухфакторная аутентификация</h2>
+<div class="info">
+    Введите 6-значный код из вашего приложения аутентификации (Google Authenticator, Authy и т.д.)
+</div>
+<form id="2faForm">
+    <input type="text" name="code" placeholder="000000" maxlength="6" pattern="[0-9]{6}" required>
+    <button type="submit">Подтвердить</button>
+</form>
+<p class="error" id="errorMsg"></p>
+<a href="/logout">Отмена</a>
+
+<script>
+    document.getElementById('2faForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const res = await fetch('/api/2fa/verify', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', credentials: "include"},
+            body: JSON.stringify({code: e.target.code.value})
+        });
+        if (res.ok) location.href = '/tests';
+        else {
+            const err = await res.text();
+            document.getElementById('errorMsg').textContent = err || 'Неверный код';
+        }
+    };
+</script>
+</body>
+</html>

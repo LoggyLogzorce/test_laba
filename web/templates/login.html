@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Вход</title>
+  <style>
+    body { font-family: Arial; max-width: 400px; margin: 50px auto; }
+    input { width: 100%; margin: 10px 0; padding: 8px; }
+    button { width: 100%; padding: 10px; }
+    .error { color: red; }
+    .sqli-demo { margin-top: 20px; padding: 10px; background: #f0f0f0; }
+  </style>
+</head>
+<body>
+<h2>Вход</h2>
+<form id="loginForm">
+  <input type="text" name="login" placeholder="Логин" required>
+  <input type="password" name="password" placeholder="Пароль" required>
+  <button type="submit">Войти</button>
+</form>
+<p class="error" id="errorMsg"></p>
+<a href="/register">Регистрация</a>
+
+<div class="sqli-demo">
+  <h4>Поиск теста</h4>
+  <input type="text" id="sqliInput" placeholder="Название теста">
+  <button onclick="sqliSearch()">Поиск</button>
+  <pre id="sqliResult"></pre>
+</div>
+
+<script>
+  document.getElementById('loginForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      body: new FormData(e.target)
+    });
+    const data = await res.json();
+
+    if (!data.success) {
+      document.getElementById('errorMsg').textContent = data.message;
+      return;
+    }
+
+    if (data.requires_2fa) {
+      // Переход на страницу 2FA
+      location.href = '/2fa';
+    } else {
+      // Успешный вход
+      location.href = '/tests';
+    }
+  };
+
+  async function sqliSearch() {
+    const title = document.getElementById('sqliInput').value;
+    const res = await fetch(`/demo/sqli?title=${encodeURIComponent(title)}`);
+    const data = await res.json();
+    document.getElementById('sqliResult').textContent = JSON.stringify(data, null, 2);
+  }
+</script>
+</body>
+</html>

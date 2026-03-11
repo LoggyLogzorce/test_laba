@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Пользователи</title>
+  <style>
+    body { font-family: Arial; padding: 20px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #ddd; padding: 8px; }
+    .admin-only { display: none; }
+  </style>
+</head>
+<body>
+<h2>Пользователи</h2>
+<a href="/tests">Назад</a>
+
+<div class="admin-only" id="adminControls">
+  <button onclick="loadUsers()">Обновить</button>
+</div>
+
+<table>
+  <thead>
+  <tr><th>ID</th><th>Логин</th><th>Роль</th><th>Email</th><th>Действия</th></tr>
+  </thead>
+  <tbody id="usersTable"></tbody>
+</table>
+
+<script>
+  let role = '';
+  document.cookie.split(';').forEach(c => {
+    if(c.trim().startsWith('role=')) role = c.split('=')[1];
+  });
+
+  if(role === 'admin') {
+    document.getElementById('adminControls').style.display = 'block';
+    loadUsers();
+  } else {
+    document.body.innerHTML = '<h1>Доступ запрещён</h1><a href="/tests">Назад</a>';
+  }
+
+  async function loadUsers() {
+    const res = await fetch('/api/users');
+    const users = await res.json();
+    document.getElementById('usersTable').innerHTML = users.map(u => `
+                <tr>
+                    <td>${u.ID}</td>
+                    <td>${u.Login}</td>
+                    <td>${u.Role}</td>
+                    <td>${u.Email}</td>
+                    <td><button onclick="deleteUser(${u.ID})">Удалить</button></td>
+                </tr>
+            `).join('');
+  }
+
+  async function deleteUser(id) {
+    if(confirm('Удалить пользователя?')) {
+      await fetch(`/api/users/delete?id=${id}`, {method: 'POST'});
+      loadUsers();
+    }
+  }
+</script>
+</body>
+</html>

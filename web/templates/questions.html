@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Тест: <span id="testTitle"></span></title>
+  <style>
+    body { font-family: Arial; max-width: 800px; margin: 0 auto; padding: 20px; }
+    .test-header { background: #f5f5f5; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+    .question { border: 1px solid #ddd; padding: 15px; margin: 15px 0; border-radius: 5px; }
+    .question-title { font-weight: bold; margin-bottom: 10px; }
+    .question-type { font-size: 12px; color: #666; margin-left: 10px; }
+    .options label { display: block; margin: 5px 0; cursor: pointer; }
+    textarea { width: 100%; min-height: 80px; padding: 8px; box-sizing: border-box; }
+    input[type="text"] { width: 100%; padding: 8px; box-sizing: border-box; }
+    .timer { position: fixed; top: 10px; right: 20px; background: #ff6b6b; color: white; padding: 10px 15px; border-radius: 5px; font-weight: bold; }
+    .timer.warning { background: #ffa500; }
+    .timer.expired { background: #dc3545; }
+    button { background: #4CAF50; color: white; padding: 12px 24px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
+    button:hover { background: #45a049; }
+    button:disabled { background: #ccc; cursor: not-allowed; }
+    .nav { margin-bottom: 20px; }
+    .nav a { margin-right: 15px; }
+    .score-info { font-size: 14px; color: #555; margin-top: 5px; }
+    .submitted { display: none; text-align: center; padding: 20px; background: #d4edda; border-radius: 5px; }
+  </style>
+</head>
+<body>
+<div class="nav">
+  <a href="/tests">← Назад к тестам</a>
+  <a href="/attempts">Мои попытки</a>
+</div>
+
+<div class="timer" id="timer">00:00</div>
+
+<div id="testContent">
+  <div class="test-header">
+    <h2 id="testTitle">Загрузка...</h2>
+    <p id="testDesc"></p>
+    <div class="score-info">
+      ⏱ Лимит: <span id="timeLimit"></span> мин |
+      ✅ Проходной балл: <span id="passScore"></span> |
+      📊 Макс. баллов: <span id="maxScore"></span>
+    </div>
+  </div>
+
+  <form id="testForm">
+    <div id="questionsContainer"></div>
+    <button type="submit" id="submitBtn">Завершить тест</button>
+  </form>
+</div>
+
+<div class="submitted" id="submittedBlock">
+  <h3>✅ Тест завершён!</h3>
+  <p>Ваши ответы отправлены на проверку.</p>
+  <a href="/tests">Вернуться к списку</a>
+</div>
+
+<script>
+  const testId = new URLSearchParams(window.location.search).get('id');
+  let timeLeft = 0;
+  let timerInterval = null;
+  let answers = {};
+
+  async function loadTest() {
+    const res = await fetch(`/api/questions/test/${testId}`);
+    if (!res.ok) {
+      document.getElementById('testContent').innerHTML = '<h3>❌ Тест не найден</h3>';
+      return;
+    }
+    const data = await res.json();
+    renderTest(data);
+  }
+
+  function renderTest(data) {
+    const { test, questions } = data;
+
+    document.getElementById('testTitle').textContent = test.название;
+    document.getElementById('testDesc').textContent = test.описание || 'Описание отсутствует';
+    document.getElementById('timeLimit').textContent = test.лимит_времени;
+    document.getElementById('passScore').textContent = test.проходной_балл;
+
+    // Подсчёт макс. баллов
+    const maxScore = questions.reduce((sum, q) => sum + q.макс_балл, 0);
+    document.getElementById('maxScore').textContent = maxScore;
+
+    // Таймер
+    timeLeft = test.лимит_времени * 60;
+    startTimer();
+
+    // Рендер вопросов
+    const container = document.getElementById('questionsContainer');
+    container.innerHTML = questions.sort((a,b) => a.порядковый_номер - b.порядковый_номер).map(q => {
+      const typeLabel = { 'single': 'Один вариант', 'multiple': 'Несколько вариантов', 'text': 'Текстовый ответ' }[q.тип_вопроса];
+
+      if (q.тип_вопроса === 'single') {
+        return `
+                        <div class="question" data-qid="${q.id_вопроса}" data-type="single" data-score="${q.макс_балл}">
+                            <div class="question-title">
+                                ${q.порядковый_номер}. ${q.текст_вопроса}
+                                <span class="question-type">${typeLabel} • ${q.макс_балл} балл${q.макс_балл > 1 ? 'а' : ''}</span>
+                            </div>
+                            <div class="options" id="opts-${q.id_вопроса}">
+                                <!-- Варианты загрузятся отдельно -->
+                                <em>Загрузка вариантов...</em>
+                            </div>
+                        </div>
+                    `;
+      } else if (q.тип_вопроса === 'multiple') {
+        return `
+                        <div class="question" data-qid="${q.id_вопроса}" data-type="multiple" data-score="${q.макс_балл}">
+                            <div class="question-title">
+                                ${q.порядковый_номер}. ${q.текст_вопроса}
+                                <span class="question-type">${typeLabel} • ${q.макс_балл} балл${q.макс_балл > 1 ? 'а' : ''}</span>
+                            </div>
+                            <div class="options" id="opts-${q.id_вопроса}">
+                                <em>Загрузка вариантов...</em>
+                            </div>
+                        </div>
+                    `;
+      } else {
+        return `
+                        <div class="question" data-qid="${q.id_вопроса}" data-type="text" data-score="${q.макс_балл}">
+                            <div class="question-title">
+                                ${q.порядковый_номер}. ${q.текст_вопроса}
+                                <span class="question-type">${typeLabel} • ${q.макс_балл} балл${q.макс_балл > 1 ? 'а' : ''}</span>
+                            </div>
+                            <textarea name="answer_${q.id_вопроса}" placeholder="Введите ваш ответ..."></textarea>
+                        </div>
+                    `;
+      }
+    }).join('');
+
+    // Загрузка вариантов ответов для single/multiple
+    questions.filter(q => q.тип_вопроса !== 'text').forEach(q => {
+      loadAnswerOptions(q.id_вопроса, q.тип_вопроса);
+    });
+  }
+
+  async function loadAnswerOptions(questionId, type) {
+    const res = await fetch(`/api/question/${questionId}/options`);
+    const options = await res.json();
+    const container = document.getElementById(`opts-${questionId}`);
+
+    const inputType = type === 'single' ? 'radio' : 'checkbox';
+    const groupName = type === 'single' ? `q_${questionId}` : '';
+
+    container.innerHTML = options.map((opt, idx) => `
+                <label>
+                    <input type="${inputType}" name="${groupName}" value="${opt.id_варианта}"
+                           ${type === 'multiple' ? `data-opt="${opt.id_варианта}"` : ''}>
+                    ${opt.порядковый_номер}. ${opt.текст_варианта}
+                </label>
+            `).join('');
+
+    // Обработчики для сохранения ответов
+    container.querySelectorAll('input').forEach(inp => {
+      inp.onchange = (e) => {
+        if (type === 'single') {
+          answers[questionId] = { type: 'single', value: e.target.value };
+        } else {
+          // multiple: массив выбранных
+          const checked = Array.from(container.querySelectorAll('input:checked')).map(i => i.value);
+          answers[questionId] = { type: 'multiple', value: checked };
+        }
+      };
+    });
+  }
+
+  // Текстовые ответы
+  document.addEventListener('input', (e) => {
+    if (e.target.tagName === 'TEXTAREA') {
+      const qid = e.target.name.replace('answer_', '');
+      answers[qid] = { type: 'text', value: e.target.value };
+    }
+  });
+
+  // Таймер
+  function startTimer() {
+    updateTimerDisplay();
+    timerInterval = setInterval(() => {
+      timeLeft--;
+      updateTimerDisplay();
+      if (timeLeft <= 0) {
+        clearInterval(timerInterval);
+        submitTest();
+      }
+    }, 1000);
+  }
+
+  function updateTimerDisplay() {
+    const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
+    const s = (timeLeft % 60).toString().padStart(2, '0');
+    const timerEl = document.getElementById('timer');
+    timerEl.textContent = `${m}:${s}`;
+
+    timerEl.className = 'timer';
+    if (timeLeft <= 60) timerEl.classList.add('expired');
+    else if (timeLeft <= 300) timerEl.classList.add('warning');
+  }
+
+  // Отправка теста
+  document.getElementById('testForm').onsubmit = async (e) => {
+    e.preventDefault();
+    if (!confirm('Завершить тест?')) return;
+
+    await submitTest();
+  };
+
+  async function submitTest() {
+    clearInterval(timerInterval);
+    document.getElementById('submitBtn').disabled = true;
+
+    // Формируем ответ
+    const payload = {
+      test_id: testId,
+      answers: Object.entries(answers).map(([qid, ans]) => ({
+        question_id: parseInt(qid),
+        answer_type: ans.type,
+        answer_value: ans.type === 'multiple' ? ans.value.join(',') : ans.value,
+        selected_options: ans.type === 'multiple' ? ans.value : null
+      }))
+    };
+
+    const res = await fetch(`/api/tests/${testId}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.ok) {
+      document.getElementById('testContent').style.display = 'none';
+      document.getElementById('timer').style.display = 'none';
+      document.getElementById('submittedBlock').style.display = 'block';
+    } else {
+      alert('Ошибка отправки: ' + await res.text());
+      document.getElementById('submitBtn').disabled = false;
+    }
+  }
+
+  // Предупреждение при уходе со страницы
+  window.addEventListener('beforeunload', (e) => {
+    if (timerInterval && timeLeft > 0) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  });
+
+  // Инициализация
+  if (testId) loadTest();
+  else document.body.innerHTML = '<h2>❌ Не указан ID теста</h2><a href="/tests">Назад</a>';
+</script>
+</body>
+</html>

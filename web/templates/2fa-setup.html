@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Настройка 2FA</title>
+    <style>
+        body { font-family: Arial; max-width: 600px; margin: 50px auto; }
+        .step { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        .qr { text-align: center; margin: 10px 0; }
+        .secret { background: #f0f0f0; padding: 10px; font-family: monospace; }
+        button { padding: 10px 20px; margin: 5px; }
+        .enabled { color: green; }
+        .disabled { color: red; }
+    </style>
+</head>
+<body>
+<h2>Настройка 2FA</h2>
+<a href="/tests">Назад</a>
+
+<div class="step">
+    <h3>Статус: <span id="2faStatus" class="disabled">Отключено</span></h3>
+</div>
+
+<div class="step" id="setupStep">
+    <h3>Шаг 1: Отсканируйте QR-код</h3>
+    <p>Используйте Google Authenticator, Authy или аналогичное приложение</p>
+    <div class="qr">
+        <img id="qrCode" alt="QR Code будет здесь" style="max-width: 200px;">
+    </div>
+    <p>Или введите секрет вручную:</p>
+    <div class="secret" id="secretKey">Загрузка...</div>
+</div>
+
+<div class="step" id="verifyStep">
+    <h3>Шаг 2: Подтвердите настройку</h3>
+    <input type="text" id="confirmCode" placeholder="6-значный код" maxlength="6">
+    <button onclick="enable2FA()">Включить 2FA</button>
+</div>
+
+<div class="step" id="disableStep" style="display:none;">
+    <h3>Отключить 2FA</h3>
+    <button onclick="disable2FA()">Отключить</button>
+</div>
+
+<script>
+    let is2FAEnabled = false;
+
+    async function load2FAStatus() {
+        const res = await fetch('/api/2fa/status');
+        const data = await res.json();
+        is2FAEnabled = data.enabled;
+
+        document.getElementById('2faStatus').textContent = is2FAEnabled ? 'Включено' : 'Отключено';
+        document.getElementById('2faStatus').className = is2FAEnabled ? 'enabled' : 'disabled';
+
+        if (is2FAEnabled) {
+            document.getElementById('setupStep').style.display = 'none';
+            document.getElementById('verifyStep').style.display = 'none';
+            document.getElementById('disableStep').style.display = 'block';
+        } else {
+            generateSecret();
+        }
+    }
+
+    async function generateSecret() {
+        const res = await fetch('/api/2fa/generate', {method: 'POST'});
+        const data = await res.json();
+        document.getElementById('secretKey').textContent = data.secret;
+        document.getElementById('qrCode').src = data.qr_code;
+    }
+
+    async function enable2FA() {
+        const code = document.getElementById('confirmCode').value;
+        const secret = document.getElementById('secretKey').innerText;
+        console.log(JSON.stringify({"code": code, "secret": secret}))
+        const res = await fetch('/api/2fa/enable', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({"code": code, "secret": secret})
+        });
+        if (res.ok) {
+            alert('2FA включён!');
+            load2FAStatus();
+        } else {
+            alert('Неверный код');
+        }
+    }
+
+    async function disable2FA() {
+        if (confirm('Вы уверены? Это снизит безопасность аккаунта.')) {
+            const res = await fetch('/api/2fa/disable', {method: 'POST'});
+            if (res.ok) {
+                alert('2FA отключён');
+                load2FAStatus();
+            }
+        }
+    }
+
+    load2FAStatus();
+</script>
+</body>
+</html>
